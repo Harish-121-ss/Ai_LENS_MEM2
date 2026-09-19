@@ -1,0 +1,12 @@
+{
+  "run_id": "r-ta-1",
+  "agent_version": "v1.2",
+  "prompt_version": "p-3",
+  "request": "Tell me a joke",
+  "events": [],
+  "tool_calls": [],
+  "tokens": 950000,
+  "latency_ms": 200,
+  "errors": [],
+  "outcome": "success"
+}

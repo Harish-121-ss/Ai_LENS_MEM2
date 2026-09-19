@@ -1,0 +1,22 @@
+[
+  {
+    "agent_version": "v1.2",
+    "prompt_version": "p-3",
+    "request": "missing run_id",
+    "outcome": "success"
+  },
+  {
+    "run_id": "r-mal-2",
+    "agent_version": "v1.2",
+    "prompt_version": "p-3",
+    "request": "negative seq",
+    "events": [
+      {
+        "seq": -1,
+        "type": "tool_call",
+        "timestamp_ms": 1000
+      }
+    ],
+    "outcome": "success"
+  }
+]

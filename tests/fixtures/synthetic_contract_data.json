@@ -1,0 +1,15 @@
+{
+  "valid_run": {
+    "run_id": "r-123",
+    "agent_version": "v1.0",
+    "prompt_version": "p-2",
+    "request": "Do something",
+    "events": [],
+    "tool_calls": [],
+    "tokens": 100,
+    "latency_ms": 500,
+    "errors": [],
+    "outcome": "SUCCESS",
+    "detected_failures": []
+  }
+}

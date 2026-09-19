@@ -1,0 +1,26 @@
+{
+  "run_id": "r-norm-1",
+  "agent_version": "v1.2",
+  "prompt_version": "p-3",
+  "request": "Where is order #8271?",
+  "events": [
+    {
+      "seq": 0,
+      "type": "tool_call",
+      "timestamp_ms": 1000,
+      "tool": "get_order",
+      "arguments": {"order_id": "8271"},
+      "status": "success",
+      "result": {"status": "shipped"},
+      "latency_ms": 150
+    }
+  ],
+  "tool_calls": [
+    {"name": "get_order"}
+  ],
+  "tokens": 450,
+  "latency_ms": 800,
+  "errors": [],
+  "outcome": "success",
+  "detected_failures": []
+}
