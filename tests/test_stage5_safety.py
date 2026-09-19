@@ -59,8 +59,15 @@ def test_p5_t41_immutability():
         inc.severity = Severity.MEDIUM
 
 def test_p5_t42_no_filesystem_mutation(tmp_path):
-    # Just a placeholder test verifying the engine doesn't write files.
-    # We can check by running it and ensuring our tmp_path remains empty.
+    import os
+    from agentlens.engine.rca_engine import generate_and_validate_rca
+    from agentlens.engine.rca_provider import MockBedrockProvider
+    
+    # Snapshot initial working directory contents
+    work_dir = os.getcwd()
+    initial_files = set(os.listdir(work_dir))
+    
+    # Execute full RCA pipeline
     inc = Incident(
         incident_id="inc-1",
         run_id="r-1",
@@ -70,22 +77,29 @@ def test_p5_t42_no_filesystem_mutation(tmp_path):
         evidence=[],
         metrics={}
     )
-    data = {
-        "primary_failure": "Tool timeout",
-        "probable_root_cause": "Timeout",
-        "evidence": [],
-        "impact": [],
-        "recommended_action": "Fix",
-        "confidence": 0.9
-    }
-    validate_rca_output(inc, json.dumps(data))
-    assert len(list(tmp_path.iterdir())) == 0
+    
+    mock_provider = MockBedrockProvider(
+        response_mock=json.dumps({
+            "primary_failure": "Tool timeout",
+            "probable_root_cause": "Timeout",
+            "evidence": [],
+            "impact": [],
+            "recommended_action": "Fix",
+            "confidence": 0.9
+        })
+    )
+    
+    generate_and_validate_rca(inc, mock_provider)
+    
+    # Snapshot final working directory contents
+    final_files = set(os.listdir(work_dir))
+    
+    assert initial_files == final_files, "Unexpected files were created during RCA pipeline execution"
 
-def test_p5_t43_regression_tests():
-    # End-to-end regression test verifying Stages 3 -> 4 -> 5 pipeline
-    # 1. Normalization (Stage 3)
+
+def test_p5_t43_canonical_timeout_retry_regression():
     raw_telemetry = {
-        "run_id": "r-regress-1",
+        "run_id": "r-timeout-canonical",
         "agent_version": "1.0",
         "prompt_version": "1.0",
         "request": "Do something",
@@ -94,8 +108,8 @@ def test_p5_t43_regression_tests():
                 "timestamp_ms": 1000,
                 "type": "tool_call",
                 "seq": 1,
-                "tool": "get_order",
-                "arguments": {"order_id": "123"},
+                "tool": "fetch_data",
+                "arguments": {"id": "x"},
                 "status": "error",
                 "result": "timeout"
             },
@@ -103,39 +117,44 @@ def test_p5_t43_regression_tests():
                 "timestamp_ms": 2000,
                 "type": "tool_call",
                 "seq": 2,
-                "tool": "get_order",
-                "arguments": {"order_id": "123"},
+                "tool": "fetch_data",
+                "arguments": {"id": "x"},
                 "status": "error",
                 "result": "timeout"
             }
         ],
         "outcome": "failure"
     }
+    
+    # Normalizer (Stage 3)
     run = normalize_run(raw_telemetry)
-    assert run.run_id == "r-regress-1"
+    assert run.run_id == "r-timeout-canonical"
     
-    # 2. Detectors (Stage 4)
+    # Detectors (Stage 4)
     all_results = []
-    
-    for res in [
-        detect_timeout_retry(run),
-        detect_tool_loop(run),
-        detect_wrong_tool(run),
-        detect_token_anomaly(run, 1000)
-    ]:
+    for detect_func in [detect_timeout_retry, detect_tool_loop, detect_wrong_tool, detect_token_anomaly]:
+        res = detect_func(run) if detect_func != detect_token_anomaly else detect_func(run, 1000)
         if res:
             all_results.append(res)
     
-    # Assert timeout/retry detector found something (2 exact timeouts)
-    assert len(all_results) >= 1
+    # Verify exact detector result
+    assert len(all_results) == 1
+    det = all_results[0]
+    assert det.failure_type == FailureType.TIMEOUT_RETRY
+    assert det.severity == Severity.MEDIUM
+    assert len(det.evidence) == 2
+    assert det.metrics["retry_count"] == 1
+    assert det.metrics["timeout_count"] == 1
     
-    # 3. Incident Engine (Stage 5)
+    # Incident Engine (Stage 5)
     incidents = process_detector_results(run, all_results)
-    assert len(incidents) >= 1
-    assert incidents[0].run_id == "r-regress-1"
-    assert incidents[0].incident_id.startswith("inc-r-regress-1")
+    assert len(incidents) == 1
+    inc = incidents[0]
     
-    # Ensure evidence was preserved perfectly from normalizer -> detector -> incident
-    assert len(incidents[0].evidence) > 0
-    assert incidents[0].evidence[0].source_run_id == "r-regress-1"
-    assert incidents[0].evidence[0].tool_name == "get_order"
+    # Explicitly verify Incident properties
+    assert inc.run_id == run.run_id
+    assert inc.failure_type == det.failure_type
+    assert len(inc.evidence) == len(det.evidence)
+    assert inc.metrics == det.metrics
+    assert inc.incident_id == f"inc-{run.run_id}-{FailureType.TIMEOUT_RETRY.value}"
+    assert inc.rca_status == "PENDING"

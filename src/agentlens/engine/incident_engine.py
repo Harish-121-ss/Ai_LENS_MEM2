@@ -31,7 +31,8 @@ def process_detector_results(run: Run, results: List[DetectorResult]) -> List[In
                 severity=max(existing.severity, result.severity), # Keep highest severity
                 confidence=result.confidence,
                 evidence=merged_evidence,
-                metrics={**existing.metrics, **result.metrics}
+                metrics={**existing.metrics, **result.metrics},
+                rca_status="PENDING"
             )
             incidents_by_id[inc_id] = updated_inc
         else:
@@ -42,7 +43,8 @@ def process_detector_results(run: Run, results: List[DetectorResult]) -> List[In
                 severity=result.severity,
                 confidence=result.confidence,
                 evidence=list(result.evidence),
-                metrics=dict(result.metrics)
+                metrics=dict(result.metrics),
+                rca_status="PENDING"
             )
             incidents_by_id[inc_id] = inc
 
